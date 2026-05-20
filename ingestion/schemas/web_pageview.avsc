@@ -1,0 +1,38 @@
+{
+  "type": "record",
+  "name": "WebPageview",
+  "namespace": "com.harmoni.events",
+  "doc": "Web analytics pageview event. Topic: harmoni.web.pageview. Partitioned by account_domain.",
+  "fields": [
+    {"name": "event_id",       "type": "string", "doc": "UUID v4"},
+    {"name": "account_domain", "type": "string", "doc": "Normalized account domain (partition key)"},
+    {"name": "session_id",     "type": "string", "doc": "Browser/client session identifier"},
+    {"name": "page_url",       "type": "string", "doc": "Full URL of the viewed page"},
+    {
+      "name": "page_category",
+      "type": {
+        "type": "enum",
+        "name": "PageCategory",
+        "symbols": ["PRICING", "PRODUCT", "BLOG", "DOCS", "CASE_STUDY", "DEMO", "OTHER"]
+      },
+      "default": "OTHER",
+      "doc": "Classified page category for intent scoring weight"
+    },
+    {"name": "page_title",    "type": ["null", "string"], "default": null},
+    {"name": "referrer_url",  "type": ["null", "string"], "default": null},
+    {"name": "utm_source",    "type": ["null", "string"], "default": null},
+    {"name": "utm_medium",    "type": ["null", "string"], "default": null},
+    {"name": "utm_campaign",  "type": ["null", "string"], "default": null},
+    {"name": "ip_address",    "type": ["null", "string"], "default": null, "doc": "Raw IP for identity resolution; masked after Sprint 3"},
+    {"name": "user_agent",    "type": ["null", "string"], "default": null},
+    {"name": "time_on_page_seconds", "type": ["null", "int"], "default": null},
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "ingested_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    }
+  ]
+}

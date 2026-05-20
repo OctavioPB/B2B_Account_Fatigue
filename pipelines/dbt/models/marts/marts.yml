@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  # ---------------------------------------------------------------------------
+  # Fact tables
+  # ---------------------------------------------------------------------------
+  - name: fct_account_signal_hourly
+    description: >
+      Hourly aggregated signal counts per account per source channel.
+      Primary input for the Account Fatigue Score engine (Sprint 6)
+      and Intent Network Model (Sprint 5). Written to ClickHouse.
+    meta:
+      owner: data-engineering
+      source: all_channels
+      refresh_cadence: hourly
+    columns:
+      - name: account_domain
+        tests: [not_null]
+      - name: signal_hour
+        tests: [not_null]
+      - name: source_system
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEB', 'EMAIL', 'CRM', 'WEBINAR']
+      - name: signal_count
+        tests: [not_null]
+      - name: unique_member_count
+        tests: [not_null]
+      - name: total_strength_score
+        tests: [not_null]
+      - name: _refreshed_at
+        tests: [not_null]
+
+  - name: fct_committee_engagement
+    description: >
+      Daily per-member engagement rates with role-weighted signal scores.
+      Feeds the Intent Network Model for account-level signal consolidation.
+    meta:
+      owner: data-engineering
+      source: all_channels
+      refresh_cadence: hourly
+    columns:
+      - name: member_id
+        tests: [not_null]
+      - name: account_id
+        tests: [not_null]
+      - name: signal_day
+        tests: [not_null]
+      - name: source_system
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEB', 'EMAIL', 'CRM', 'WEBINAR']
+      - name: signal_count
+        tests: [not_null]
+      - name: weighted_signal_score
+        tests: [not_null]
+      - name: seniority_level
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['C_SUITE', 'VP', 'DIRECTOR', 'MANAGER', 'IC']
+
+  # ---------------------------------------------------------------------------
+  # Dimension views
+  # ---------------------------------------------------------------------------
+  - name: dim_account
+    description: >
+      Current-state account dimension. View over snap_accounts where
+      dbt_valid_to IS NULL. For point-in-time queries read the snapshot directly.
+    meta:
+      owner: data-engineering
+      source: identity
+      refresh_cadence: realtime
+    columns:
+      - name: account_id
+        tests: [not_null, unique]
+      - name: domain
+        tests: [not_null, unique]
+      - name: scd_valid_from
+        tests: [not_null]
+      - name: arr_tier_rank
+        tests:
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5]
+
+  - name: dim_committee_member
+    description: >
+      Current-state committee member dimension with account context.
+      View over snap_committee_members where dbt_valid_to IS NULL.
+    meta:
+      owner: data-engineering
+      source: identity
+      refresh_cadence: realtime
+    columns:
+      - name: member_id
+        tests: [not_null, unique]
+      - name: account_id
+        tests: [not_null]
+      - name: email
+        tests: [not_null]
+      - name: seniority_level
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['C_SUITE', 'VP', 'DIRECTOR', 'MANAGER', 'IC']
+      - name: role_weight
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1

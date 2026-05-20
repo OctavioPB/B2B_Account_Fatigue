@@ -1,0 +1,54 @@
+{
+  "type": "record",
+  "name": "WebinarAttendance",
+  "namespace": "com.harmoni.events",
+  "doc": "Webinar attendance event (Zoom / GoToWebinar). Strong buying intent signal. Topic: harmoni.webinar.attendance.",
+  "fields": [
+    {"name": "event_id",          "type": "string"},
+    {"name": "account_domain",    "type": "string", "doc": "Normalized account domain (partition key)"},
+    {"name": "contact_email",     "type": "string"},
+    {"name": "contact_first_name","type": ["null", "string"], "default": null},
+    {"name": "contact_last_name", "type": ["null", "string"], "default": null},
+    {"name": "contact_title",     "type": ["null", "string"], "default": null},
+    {"name": "webinar_id",        "type": "string", "doc": "Platform-specific webinar/event ID"},
+    {"name": "webinar_title",     "type": "string"},
+    {
+      "name": "webinar_topic",
+      "type": {
+        "type": "enum",
+        "name": "WebinarTopic",
+        "symbols": ["PRODUCT_DEMO", "THOUGHT_LEADERSHIP", "CUSTOMER_STORY", "TECHNICAL", "OTHER"]
+      },
+      "default": "OTHER"
+    },
+    {
+      "name": "attendance_type",
+      "type": {
+        "type": "enum",
+        "name": "AttendanceType",
+        "symbols": ["REGISTERED", "ATTENDED_LIVE", "WATCHED_RECORDING", "NO_SHOW"]
+      }
+    },
+    {"name": "attendance_duration_minutes", "type": ["null", "int"], "default": null, "doc": "For ATTENDED_LIVE — minutes in session"},
+    {"name": "questions_asked",   "type": "int",     "default": 0},
+    {"name": "polls_answered",    "type": "int",     "default": 0},
+    {
+      "name": "platform",
+      "type": {
+        "type": "enum",
+        "name": "WebinarPlatform",
+        "symbols": ["ZOOM", "GOTOWEBINAR", "ON24", "DEMIO", "OTHER"]
+      },
+      "default": "OTHER"
+    },
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "For REGISTERED: registration time. For ATTENDED_LIVE: session start time."
+    },
+    {
+      "name": "ingested_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    }
+  ]
+}

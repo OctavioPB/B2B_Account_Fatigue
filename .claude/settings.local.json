@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"c:\\\\Users\\\\USER\\\\Documents\\\\Github\\\\B2B_Account_Fatigue\")"
+    ]
+  }
+}

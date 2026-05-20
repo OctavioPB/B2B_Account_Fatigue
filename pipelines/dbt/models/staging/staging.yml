@@ -1,0 +1,147 @@
+version: 2
+
+models:
+  - name: stg_web_pageviews
+    description: "Cleaned web pageview events. One row per pageview event."
+    meta:
+      owner: data-engineering
+      source: web
+      refresh_cadence: realtime
+    columns:
+      - name: raw_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null]
+      - name: source_system
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEB']
+      - name: occurred_at
+        tests: [not_null]
+      - name: signal_strength
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEAK', 'MEDIUM', 'STRONG']
+      - name: page_category
+        tests:
+          - accepted_values:
+              values: ['PRICING', 'PRODUCT', 'BLOG', 'DOCS', 'CASE_STUDY', 'DEMO', 'OTHER']
+
+  - name: stg_email_engagements
+    description: "Cleaned email engagement events. One row per engagement action."
+    meta:
+      owner: data-engineering
+      source: email
+      refresh_cadence: realtime
+    columns:
+      - name: raw_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null]
+      - name: occurred_at
+        tests: [not_null]
+      - name: engagement_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED',
+                       'FORWARDED', 'UNSUBSCRIBED', 'BOUNCED', 'SPAM_REPORTED']
+      - name: is_negative
+        tests: [not_null]
+      - name: signal_strength
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEAK', 'MEDIUM', 'STRONG']
+
+  - name: stg_crm_contact_activities
+    description: "Cleaned CRM contact activity events."
+    meta:
+      owner: data-engineering
+      source: crm
+      refresh_cadence: realtime
+    columns:
+      - name: raw_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null]
+      - name: occurred_at
+        tests: [not_null]
+      - name: crm_source
+        tests:
+          - accepted_values:
+              values: ['HUBSPOT', 'SALESFORCE', 'PIPEDRIVE', 'CUSTOM']
+      - name: activity_type
+        tests: [not_null]
+      - name: signal_strength
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEAK', 'MEDIUM', 'STRONG']
+
+  - name: stg_webinar_attendances
+    description: "Cleaned webinar attendance events."
+    meta:
+      owner: data-engineering
+      source: webinar
+      refresh_cadence: realtime
+    columns:
+      - name: raw_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null]
+      - name: occurred_at
+        tests: [not_null]
+      - name: attendance_type
+        tests:
+          - accepted_values:
+              values: ['REGISTERED', 'ATTENDED_LIVE', 'WATCHED_RECORDING', 'NO_SHOW']
+      - name: signal_strength
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEAK', 'MEDIUM', 'STRONG']
+
+  - name: stg_accounts
+    description: "Cleaned account records from the identity resolution engine."
+    meta:
+      owner: data-engineering
+      source: identity
+      refresh_cadence: realtime
+    columns:
+      - name: account_id
+        tests: [not_null, unique]
+      - name: domain
+        tests: [not_null, unique]
+      - name: arr_band
+        tests:
+          - accepted_values:
+              values: ['STARTUP', 'SMB', 'MID_MARKET', 'ENTERPRISE', 'LARGE_ENTERPRISE']
+              severity: warn
+
+  - name: stg_committee_members
+    description: "Cleaned committee member records linked to accounts."
+    meta:
+      owner: data-engineering
+      source: identity
+      refresh_cadence: realtime
+    columns:
+      - name: member_id
+        tests: [not_null, unique]
+      - name: account_id
+        tests: [not_null]
+      - name: email
+        tests: [not_null]
+      - name: seniority_level
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['C_SUITE', 'VP', 'DIRECTOR', 'MANAGER', 'IC']
+      - name: role_weight
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1

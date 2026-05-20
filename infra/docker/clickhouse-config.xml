@@ -1,0 +1,18 @@
+<!-- harmoni ClickHouse local development configuration -->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+
+    <!-- Allow connections from all interfaces in local dev -->
+    <listen_host>0.0.0.0</listen_host>
+
+    <!-- Disable usage reporting -->
+    <send_crash_reports>
+        <enabled>false</enabled>
+    </send_crash_reports>
+
+    <!-- Increase max memory for local analytics queries -->
+    <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+</clickhouse>

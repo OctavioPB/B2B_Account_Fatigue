@@ -1,0 +1,35 @@
+{
+  "type": "record",
+  "name": "EmailEngagement",
+  "namespace": "com.harmoni.events",
+  "doc": "Email engagement event (open, click, reply, unsubscribe, bounce, spam). Topic: harmoni.email.engagement.",
+  "fields": [
+    {"name": "event_id",        "type": "string"},
+    {"name": "account_domain",  "type": "string", "doc": "Normalized account domain (partition key)"},
+    {"name": "contact_email",   "type": "string", "doc": "Email address of the recipient"},
+    {"name": "campaign_id",     "type": ["null", "string"], "default": null},
+    {"name": "campaign_name",   "type": ["null", "string"], "default": null},
+    {"name": "message_id",      "type": ["null", "string"], "default": null, "doc": "Email provider message ID"},
+    {
+      "name": "engagement_type",
+      "type": {
+        "type": "enum",
+        "name": "EmailEngagementType",
+        "symbols": ["SENT", "DELIVERED", "OPENED", "CLICKED", "REPLIED", "FORWARDED", "UNSUBSCRIBED", "BOUNCED", "SPAM_REPORTED"],
+        "doc": "Type of email engagement event"
+      }
+    },
+    {"name": "click_url",       "type": ["null", "string"], "default": null, "doc": "URL clicked if engagement_type=CLICKED"},
+    {"name": "subject_line",    "type": ["null", "string"], "default": null},
+    {"name": "sender_email",    "type": ["null", "string"], "default": null},
+    {"name": "is_negative",     "type": "boolean", "default": false, "doc": "True for UNSUBSCRIBED, BOUNCED, SPAM_REPORTED — raises fatigue score"},
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "ingested_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    }
+  ]
+}

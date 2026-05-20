@@ -1,0 +1,60 @@
+{
+  "type": "record",
+  "name": "IntentSignal",
+  "namespace": "com.harmoni.events",
+  "doc": "Canonical account-level intent signal. Every source event is normalized to this schema before downstream ML processing. Partitioned by account_domain.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "UUID v4 — globally unique signal identifier"
+    },
+    {
+      "name": "account_domain",
+      "type": "string",
+      "doc": "Normalized email domain (canonical account key per ADR 0001). Partition key."
+    },
+    {
+      "name": "contact_email",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Raw contact email that originated the signal. Null if anonymous."
+    },
+    {
+      "name": "source_system",
+      "type": {
+        "type": "enum",
+        "name": "SourceSystem",
+        "symbols": ["WEB", "EMAIL", "CRM", "WEBINAR", "MANUAL"],
+        "doc": "Origin system that produced this signal"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "doc": "Source-specific event type string (e.g. 'pageview', 'email_open', 'meeting_booked')"
+    },
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "When the signal occurred, milliseconds since Unix epoch (UTC)"
+    },
+    {
+      "name": "ingested_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "When harmoni received the signal, milliseconds since Unix epoch (UTC)"
+    },
+    {
+      "name": "signal_strength",
+      "type": {"type": "enum", "name": "SignalStrength", "symbols": ["WEAK", "MEDIUM", "STRONG"]},
+      "default": "WEAK",
+      "doc": "Pre-computed signal strength before role-weighted aggregation"
+    },
+    {
+      "name": "properties",
+      "type": {"type": "map", "values": "string"},
+      "default": {},
+      "doc": "Source-specific key-value properties. Values are always strings; parse numerics in consumers."
+    }
+  ]
+}

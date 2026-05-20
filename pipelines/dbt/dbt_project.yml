@@ -1,0 +1,96 @@
+name: 'harmoni'
+version: '1.0.0'
+config-version: 2
+
+profile: 'harmoni'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+docs-paths: ["docs"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# ---------------------------------------------------------------------------
+# Global variable defaults
+# ---------------------------------------------------------------------------
+vars:
+  # Lookback window for incremental models on first run
+  incremental_lookback_days: 3
+  # IP_MEDIUM_THRESHOLD mirrors identity.resolver.AsyncAccountResolver
+  ip_medium_confidence_threshold: 0.70
+
+# ---------------------------------------------------------------------------
+# Model configurations by layer
+# ---------------------------------------------------------------------------
+models:
+  harmoni:
+    staging:
+      +materialized: view
+      +schema: staging
+      +meta:
+        layer: staging
+        refresh_cadence: realtime
+
+    intermediate:
+      +materialized: incremental
+      +incremental_strategy: delete+insert
+      +unique_key: signal_id
+      +schema: intermediate
+      +meta:
+        layer: intermediate
+        refresh_cadence: hourly
+
+    marts:
+      facts:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+        +schema: marts
+        +meta:
+          layer: mart
+          refresh_cadence: hourly
+
+      dimensions:
+        +materialized: view
+        +schema: marts
+        +meta:
+          layer: mart
+          refresh_cadence: realtime
+
+# ---------------------------------------------------------------------------
+# Snapshot configurations
+# ---------------------------------------------------------------------------
+snapshots:
+  harmoni:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at
+    +invalidate_hard_deletes: false
+    +meta:
+      layer: snapshot
+      refresh_cadence: hourly
+      owner: data-engineering
+
+# ---------------------------------------------------------------------------
+# Seed configurations
+# ---------------------------------------------------------------------------
+seeds:
+  harmoni:
+    +schema: seeds
+
+# ---------------------------------------------------------------------------
+# Test severity overrides
+# ---------------------------------------------------------------------------
+tests:
+  harmoni:
+    +severity: error
+    # SCD immutability failures are always Sev-1
+    assert_no_scd_mutations:
+      +severity: error
+    assert_snapshot_has_current_row:
+      +severity: error

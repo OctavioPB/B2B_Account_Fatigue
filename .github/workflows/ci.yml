@@ -1,0 +1,217 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Python: lint + type-check
+  # ---------------------------------------------------------------------------
+  python-lint:
+    name: Python · Lint & Type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dev dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run ruff (lint)
+        run: ruff check .
+
+      - name: Run ruff (format check)
+        run: ruff format --check .
+
+      - name: Run mypy
+        run: mypy api/ ingestion/ scoring/ orchestrator/ identity/ --ignore-missing-imports
+
+  # ---------------------------------------------------------------------------
+  # Python: unit tests
+  # ---------------------------------------------------------------------------
+  python-tests:
+    name: Python · Unit Tests
+    runs-on: ubuntu-latest
+    needs: python-lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Run unit tests
+        run: |
+          pytest -m "not integration and not smoke" \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # ---------------------------------------------------------------------------
+  # Python: integration / smoke tests (against Docker services)
+  # ---------------------------------------------------------------------------
+  python-integration:
+    name: Python · Smoke Tests (Docker)
+    runs-on: ubuntu-latest
+    needs: python-tests
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: harmoni
+          POSTGRES_PASSWORD: harmoni
+          POSTGRES_DB: harmoni
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv pip install --system -e ".[dev,api]"
+
+      - name: Run smoke tests
+        env:
+          DATABASE_URL: postgresql://harmoni:harmoni@localhost:5432/harmoni
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest -m "smoke" -v
+
+  # ---------------------------------------------------------------------------
+  # Dashboard: type-check + build
+  # ---------------------------------------------------------------------------
+  dashboard-build:
+    name: Dashboard · Type-check & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type-check
+        run: npm run type-check
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Vitest unit tests
+        run: npm run test
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/v1
+          NEXT_PUBLIC_APP_ENV: test
+
+  # ---------------------------------------------------------------------------
+  # Schema validation: ensure all Avro schemas are well-formed
+  # ---------------------------------------------------------------------------
+  schema-validation:
+    name: Kafka · Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install fastavro
+        run: pip install fastavro
+
+      - name: Validate Avro schemas
+        run: |
+          python - <<'EOF'
+          import json
+          import sys
+          from pathlib import Path
+          import fastavro.schema
+
+          schema_dir = Path("ingestion/schemas")
+          errors = []
+          for f in schema_dir.glob("**/*.avsc"):
+              try:
+                  fastavro.schema.parse_schema(json.loads(f.read_text()))
+                  print(f"  OK  {f}")
+              except Exception as e:
+                  errors.append(f"FAIL {f}: {e}")
+                  print(f"FAIL {f}: {e}", file=sys.stderr)
+          if errors:
+              sys.exit(1)
+          print(f"\n{len(list(schema_dir.glob('**/*.avsc')))} schema(s) validated.")
+          EOF

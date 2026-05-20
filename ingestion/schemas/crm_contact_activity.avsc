@@ -1,0 +1,53 @@
+{
+  "type": "record",
+  "name": "CRMContactActivity",
+  "namespace": "com.harmoni.events",
+  "doc": "CRM contact activity event from HubSpot or Salesforce webhook. Topic: harmoni.crm.contact_activity.",
+  "fields": [
+    {"name": "event_id",          "type": "string"},
+    {"name": "account_domain",    "type": "string", "doc": "Normalized account domain (partition key)"},
+    {"name": "contact_email",     "type": "string"},
+    {"name": "crm_contact_id",    "type": "string", "doc": "Source CRM system contact ID"},
+    {"name": "crm_company_id",    "type": ["null", "string"], "default": null},
+    {
+      "name": "crm_source",
+      "type": {
+        "type": "enum",
+        "name": "CRMSource",
+        "symbols": ["HUBSPOT", "SALESFORCE", "PIPEDRIVE", "CUSTOM"]
+      }
+    },
+    {
+      "name": "activity_type",
+      "type": {
+        "type": "enum",
+        "name": "CRMActivityType",
+        "symbols": [
+          "CONTACT_CREATED", "CONTACT_UPDATED", "DEAL_CREATED", "DEAL_STAGE_CHANGED",
+          "MEETING_BOOKED", "MEETING_COMPLETED", "CALL_LOGGED", "NOTE_CREATED",
+          "EMAIL_SENT", "EMAIL_OPENED", "EMAIL_CLICKED", "TASK_CREATED", "TASK_COMPLETED",
+          "LIFECYCLE_STAGE_CHANGED", "PROPERTY_CHANGED"
+        ]
+      }
+    },
+    {"name": "deal_id",           "type": ["null", "string"], "default": null},
+    {"name": "deal_stage",        "type": ["null", "string"], "default": null},
+    {"name": "deal_value_usd",    "type": ["null", "double"], "default": null},
+    {"name": "property_name",     "type": ["null", "string"], "default": null, "doc": "For PROPERTY_CHANGED events"},
+    {"name": "property_value",    "type": ["null", "string"], "default": null},
+    {
+      "name": "raw_payload",
+      "type": {"type": "map", "values": "string"},
+      "default": {},
+      "doc": "Original webhook payload fields as strings for auditability"
+    },
+    {
+      "name": "occurred_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "ingested_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    }
+  ]
+}

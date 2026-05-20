@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: int_account_signals
+    description: >
+      Unified intent signal stream across all four source channels.
+      One row per signal event. Incremental — processes only new signals
+      since the last hourly run. account_id may be NULL for signals where
+      the domain has not yet been resolved (quarantine backfill path).
+    meta:
+      owner: data-engineering
+      source: all_channels
+      refresh_cadence: hourly
+    columns:
+      - name: signal_id
+        description: "Surrogate key: hash of (raw_id, source_system)."
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null]
+      - name: source_system
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEB', 'EMAIL', 'CRM', 'WEBINAR']
+      - name: signal_strength
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['WEAK', 'MEDIUM', 'STRONG']
+      - name: signal_strength_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3]
+      - name: occurred_at
+        tests: [not_null]
+      - name: ingested_at
+        tests: [not_null]
+      - name: is_high_intent
+        tests: [not_null]
+      - name: is_negative
+        tests: [not_null]
+
+  - name: int_committee_composition
+    description: >
+      Current and historical buying-committee membership per account, derived
+      from the SCD Type 2 snap_committee_members snapshot. Use
+      is_current_version=TRUE for current-state queries.
+    meta:
+      owner: data-engineering
+      source: identity
+      refresh_cadence: hourly
+    columns:
+      - name: composition_id
+        description: "Surrogate key: hash of dbt_scd_id."
+        tests: [not_null, unique]
+      - name: member_id
+        tests: [not_null]
+      - name: account_id
+        tests: [not_null]
+      - name: seniority_level
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['C_SUITE', 'VP', 'DIRECTOR', 'MANAGER', 'IC']
+      - name: role_weight
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+      - name: is_current_version
+        tests: [not_null]
+      - name: dbt_valid_from
+        tests: [not_null]

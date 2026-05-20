@@ -1,0 +1,239 @@
+# Prometheus alerting rules for harmoni
+# Deploy via: kubectl apply -f infra/alerting/rules.yml (or Terraform-managed ConfigMap)
+#
+# All four Sprint 10 required alerts are present plus supporting metric alerts.
+# Every alert must fire and resolve at least once before beta launch (DoD).
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # Kafka ingestion health
+  # ---------------------------------------------------------------------------
+  - name: harmoni.kafka
+    rules:
+
+      # Sprint 10: Kafka consumer lag > 5 minutes
+      - alert: KafkaConsumerLagCritical
+        expr: |
+          sum by (topic, consumer_group) (
+            kafka_consumer_group_lag{namespace="harmoni"}
+          ) > 5000
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Kafka consumer lag critical on {{ $labels.topic }}"
+          description: >
+            Consumer group {{ $labels.consumer_group }} is {{ $value | humanize }}
+            messages behind on topic {{ $labels.topic }}.
+            At 10,000 events/min this represents > 5 minutes of lag.
+            Check Airflow DAG status and consumer pod health.
+          runbook_url: "https://docs.harmoni.internal/runbooks/kafka-lag"
+
+      - alert: KafkaDLQGrowing
+        expr: |
+          rate(kafka_topic_records_count{topic="harmoni.dlq"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          team: data
+        annotations:
+          summary: "harmoni.dlq is receiving messages — schema validation failures"
+          description: >
+            {{ $value | humanize }} messages/sec are landing in the DLQ.
+            This indicates producers are sending unregistered Avro schemas.
+
+      - alert: KafkaProducerErrorRate
+        expr: |
+          rate(kafka_producer_errors_total{namespace="harmoni"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Kafka producer error rate > 1% on harmoni"
+          description: >
+            Producer error rate is {{ $value | humanizePercentage }}.
+            Check broker connectivity and Schema Registry availability.
+
+  # ---------------------------------------------------------------------------
+  # Airflow pipeline health
+  # ---------------------------------------------------------------------------
+  - name: harmoni.airflow
+    rules:
+
+      # Sprint 10: Airflow DAG failure
+      - alert: AirflowDAGFailed
+        expr: |
+          airflow_dag_run_failed{dag_id=~"dag_(intent_score_refresh|fatigue_score_refresh|nba_orchestration|hourly_account_metrics)"}
+          > 0
+        for: 0m   # alert immediately on first failure
+        labels:
+          severity: critical
+          team: data
+        annotations:
+          summary: "Airflow DAG {{ $labels.dag_id }} failed"
+          description: >
+            DAG {{ $labels.dag_id }} has {{ $value }} failed runs.
+            Account scoring may be stale. Check Airflow UI for task logs.
+          runbook_url: "https://docs.harmoni.internal/runbooks/airflow-dag-failure"
+
+      - alert: AirflowDAGStaleFatigueScores
+        expr: |
+          (time() - airflow_dag_run_last_success_timestamp{dag_id="dag_fatigue_score_refresh"})
+          > 3600
+        for: 5m
+        labels:
+          severity: high
+          team: data
+        annotations:
+          summary: "Fatigue score refresh DAG has not succeeded in > 1 hour"
+          description: >
+            The fatigue score refresh DAG should run every 30 minutes.
+            Last success was {{ $value | humanizeDuration }} ago.
+            CRITICAL fatigue accounts may not receive correct cooldowns.
+
+      - alert: AirflowDAGStaleIntentScores
+        expr: |
+          (time() - airflow_dag_run_last_success_timestamp{dag_id="dag_intent_score_refresh"})
+          > 14400
+        for: 5m
+        labels:
+          severity: high
+          team: data
+        annotations:
+          summary: "Intent score refresh DAG has not succeeded in > 4 hours"
+          description: >
+            Intent scores may be stale. Last success: {{ $value | humanizeDuration }} ago.
+
+  # ---------------------------------------------------------------------------
+  # API latency and error rate
+  # ---------------------------------------------------------------------------
+  - name: harmoni.api
+    rules:
+
+      # Sprint 10: API error rate > 1% over 5 minutes
+      - alert: APIErrorRateHigh
+        expr: |
+          sum(rate(http_requests_total{job="harmoni-api", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job="harmoni-api"}[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "harmoni API 5xx error rate > 1%"
+          description: >
+            Current error rate: {{ $value | humanizePercentage }}.
+            Investigate application logs and upstream dependencies.
+          runbook_url: "https://docs.harmoni.internal/runbooks/api-error-rate"
+
+      - alert: APILatencyP99High
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, endpoint) (
+              rate(http_request_duration_seconds_bucket{job="harmoni-api"}[5m])
+            )
+          ) > 0.2
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "harmoni API p99 latency > 200ms on {{ $labels.endpoint }}"
+          description: >
+            p99 latency is {{ $value | humanizeDuration }} on {{ $labels.endpoint }}.
+            Sprint 10 SLA requires p99 < 200ms under 500 concurrent users.
+
+      - alert: APIRateLimitedTenants
+        expr: |
+          sum by (tenant_id) (
+            rate(harmoni_rate_limit_exceeded_total[5m])
+          ) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Tenant {{ $labels.tenant_id }} is being rate-limited frequently"
+          description: >
+            {{ $value | humanize }} rate-limit rejections/min for tenant
+            {{ $labels.tenant_id }}. Consider raising their RPM limit.
+
+  # ---------------------------------------------------------------------------
+  # NBA dispatch and account health
+  # ---------------------------------------------------------------------------
+  - name: harmoni.nba
+    rules:
+
+      # Sprint 10: NBA dispatch failure for any CRITICAL fatigue account
+      - alert: NBADispatchFailureCritical
+        expr: |
+          sum by (account_domain, platform) (
+            harmoni_nba_dispatch_failures_total{fatigue_severity="CRITICAL"}
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: data
+        annotations:
+          summary: "NBA dispatch failed for CRITICAL fatigue account {{ $labels.account_domain }}"
+          description: >
+            Platform {{ $labels.platform }} failed to dispatch NBA action for
+            {{ $labels.account_domain }} (CRITICAL fatigue).
+            This account requires immediate manual intervention.
+          runbook_url: "https://docs.harmoni.internal/runbooks/nba-dispatch-failure"
+
+      - alert: NBAAccountCoverageGap
+        expr: |
+          (
+            harmoni_active_accounts_total
+            - harmoni_accounts_with_active_nba_total
+          ) / harmoni_active_accounts_total > 0.05
+        for: 15m
+        labels:
+          severity: high
+          team: data
+        annotations:
+          summary: "NBA coverage below 95% — {{ $value | humanizePercentage }} of accounts lack an active NBA"
+          description: >
+            More than 5% of active accounts have no current NBA recommendation.
+            The dag_nba_orchestration DAG may have failed or stalled.
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
+  - name: harmoni.infra
+    rules:
+
+      - alert: RedisMemoryHigh
+        expr: |
+          redis_memory_used_bytes{instance=~".*harmoni.*"}
+          / redis_memory_max_bytes{instance=~".*harmoni.*"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Redis memory usage > 85% — cooldown keys may be evicted"
+          description: >
+            Redis at {{ $value | humanizePercentage }} memory.
+            If maxmemory-policy is allkeys-lru, cooldown keys may be silently
+            evicted — fail-open behavior allows over-contact.
+
+      - alert: PostgreSQLConnectionsNearLimit
+        expr: |
+          pg_stat_database_numbackends{datname="harmoni"}
+          / pg_settings_max_connections > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "PostgreSQL connection count > 80% of max_connections"
+          description: >
+            {{ $value | humanizePercentage }} of max_connections in use.
+            Verify PgBouncer pool sizes (infra/docker/pgbouncer.ini).

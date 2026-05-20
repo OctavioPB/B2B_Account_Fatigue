@@ -1,0 +1,29 @@
+{
+  "type": "record",
+  "name": "DLQEnvelope",
+  "namespace": "com.harmoni.events",
+  "doc": "Dead-letter queue envelope. Wraps unprocessable messages with full error context. Topic: harmoni.dlq. This schema is always registered first at startup.",
+  "fields": [
+    {"name": "envelope_id",     "type": "string", "doc": "UUID v4 for this DLQ record"},
+    {"name": "source_topic",    "type": "string", "doc": "Topic the original message was produced to or consumed from"},
+    {"name": "source_partition","type": "int",    "default": -1, "doc": "-1 if unknown (pre-produce failure)"},
+    {"name": "source_offset",   "type": "long",   "default": -1, "doc": "-1 if unknown (pre-produce failure)"},
+    {"name": "error_class",     "type": "string", "doc": "Python exception class name"},
+    {"name": "error_message",   "type": "string", "doc": "Human-readable error description"},
+    {"name": "original_key",    "type": ["null", "bytes"], "default": null, "doc": "Raw bytes of the original message key"},
+    {"name": "original_value",  "type": ["null", "bytes"], "default": null, "doc": "Raw bytes of the original message value (pre-serialization if schema failed)"},
+    {
+      "name": "failure_stage",
+      "type": {
+        "type": "enum",
+        "name": "FailureStage",
+        "symbols": ["SERIALIZATION", "SCHEMA_VALIDATION", "PRODUCE", "CONSUME", "PROCESSING"],
+        "doc": "Stage in the pipeline where the failure occurred"
+      }
+    },
+    {
+      "name": "failed_at",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    }
+  ]
+}

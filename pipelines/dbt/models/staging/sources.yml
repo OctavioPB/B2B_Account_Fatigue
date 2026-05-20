@@ -1,0 +1,148 @@
+version: 2
+
+sources:
+  # ---------------------------------------------------------------------------
+  # Raw event landing tables (written by Kafka consumers)
+  # ---------------------------------------------------------------------------
+  - name: harmoni_raw
+    description: >
+      Append-only tables populated by Kafka consumers landing deserialized
+      Avro events. Never updated or deleted. All timestamps are UTC.
+    schema: public
+    database: harmoni
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 2, period: hour}
+      error_after: {count: 6, period: hour}
+    tables:
+      - name: raw_web_pageviews
+        description: "Web pixel / server-log pageview events."
+        columns:
+          - name: id
+            description: "Surrogate UUID (PostgreSQL gen_random_uuid)."
+          - name: event_id
+            description: "Unique event ID from the source connector."
+            tests: [not_null]
+          - name: account_domain
+            description: "Normalized company domain; may be NULL for anonymous events."
+          - name: contact_email
+            description: "Visitor email if known (e.g. from form fill or SSO)."
+          - name: occurred_at
+            description: "When the pageview happened (source system time)."
+            tests: [not_null]
+          - name: signal_strength
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['WEAK', 'MEDIUM', 'STRONG']
+          - name: page_category
+            tests:
+              - accepted_values:
+                  values: ['PRICING', 'PRODUCT', 'BLOG', 'DOCS', 'CASE_STUDY', 'DEMO', 'OTHER']
+                  quote: true
+
+      - name: raw_email_engagements
+        description: "Email engagement events (open, click, unsubscribe, bounce, etc.)."
+        columns:
+          - name: event_id
+            tests: [not_null]
+          - name: occurred_at
+            tests: [not_null]
+          - name: engagement_type
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED',
+                           'FORWARDED', 'UNSUBSCRIBED', 'BOUNCED', 'SPAM_REPORTED']
+          - name: is_negative
+            tests: [not_null]
+          - name: signal_strength
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['WEAK', 'MEDIUM', 'STRONG']
+
+      - name: raw_crm_contact_activities
+        description: "CRM activity events from HubSpot, Salesforce, Pipedrive."
+        columns:
+          - name: event_id
+            tests: [not_null]
+          - name: occurred_at
+            tests: [not_null]
+          - name: crm_source
+            tests:
+              - accepted_values:
+                  values: ['HUBSPOT', 'SALESFORCE', 'PIPEDRIVE', 'CUSTOM']
+          - name: activity_type
+            tests: [not_null]
+          - name: signal_strength
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['WEAK', 'MEDIUM', 'STRONG']
+
+      - name: raw_webinar_attendances
+        description: "Webinar registration and attendance events."
+        columns:
+          - name: event_id
+            tests: [not_null]
+          - name: occurred_at
+            tests: [not_null]
+          - name: attendance_type
+            tests:
+              - accepted_values:
+                  values: ['REGISTERED', 'ATTENDED_LIVE', 'WATCHED_RECORDING', 'NO_SHOW']
+          - name: signal_strength
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['WEAK', 'MEDIUM', 'STRONG']
+
+  # ---------------------------------------------------------------------------
+  # Identity resolution tables (Sprint 3)
+  # ---------------------------------------------------------------------------
+  - name: harmoni_identity
+    description: >
+      Operational identity tables managed by the Python resolution pipeline.
+      SCD Type 2 snapshots are applied to these by dbt snapshots.
+    schema: public
+    database: harmoni
+    tables:
+      - name: accounts
+        description: "Target B2B companies keyed by normalized email domain."
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: domain
+            tests: [not_null, unique]
+          - name: updated_at
+            tests: [not_null]
+
+      - name: committee_members
+        description: "Individual buying-committee stakeholders linked to an Account."
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: account_id
+            tests: [not_null]
+          - name: email
+            tests: [not_null]
+          - name: seniority_level
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['C_SUITE', 'VP', 'DIRECTOR', 'MANAGER', 'IC']
+          - name: role_weight
+            tests: [not_null]
+          - name: updated_at
+            tests: [not_null]
+
+      - name: domain_aliases
+        description: "Alias domain → canonical domain mapping (acquisitions, rebrands)."
+        columns:
+          - name: id
+            tests: [not_null, unique]
+          - name: alias_domain
+            tests: [not_null]
+          - name: canonical_domain
+            tests: [not_null]
