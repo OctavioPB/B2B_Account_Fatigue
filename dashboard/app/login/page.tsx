@@ -12,11 +12,17 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
   const login = useAuthStore((s) => s.login);
+  const enterDemo = useAuthStore((s) => s.enterDemo);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function handleDemo() {
+    enterDemo();
+    router.push("/dashboard");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -235,6 +241,46 @@ export default function LoginPage() {
                   {loading ? "Signing in…" : "Sign in →"}
                 </button>
               </form>
+
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 4px" }}>
+                <div style={{ flex: 1, height: 1, backgroundColor: "var(--primary-10)" }} />
+                <span style={{ fontFamily: "var(--fb)", fontSize: 10, color: "var(--mid)", letterSpacing: "2px", textTransform: "uppercase" }}>
+                  or
+                </span>
+                <div style={{ flex: 1, height: 1, backgroundColor: "var(--primary-10)" }} />
+              </div>
+
+              {/* Demo button */}
+              <button
+                type="button"
+                onClick={handleDemo}
+                style={{
+                  width: "100%",
+                  marginTop: 16,
+                  backgroundColor: "transparent",
+                  color: "var(--primary)",
+                  border: "1.5px solid var(--gold)",
+                  borderRadius: 6,
+                  padding: "11px 12px",
+                  fontFamily: "var(--fb)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "2px",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <span style={{ color: "var(--gold)", fontSize: 14 }}>⬡</span>
+                Try live demo
+              </button>
+              <p style={{ fontFamily: "var(--fb)", fontSize: 11, color: "var(--mid)", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
+                12 synthetic accounts · no login required
+              </p>
             </div>
           </div>
         </div>

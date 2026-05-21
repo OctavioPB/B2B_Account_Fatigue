@@ -5,7 +5,7 @@
 // CommitteeHeatmap, NBAActionCard, SignalTimeline.
 
 import { useParams } from "next/navigation";
-import { useAccountSummary } from "@/lib/hooks/useAccounts";
+import { useAccountSummary, useDemoAccountDetails } from "@/lib/hooks/useAccounts";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { Eyebrow } from "@/components/Eyebrow";
@@ -67,13 +67,16 @@ export default function AccountDetailPage() {
   const domain = decodeURIComponent(params.domain ?? "");
 
   const { data: summary, isLoading } = useAccountSummary(domain);
+  const demoDetails = useDemoAccountDetails(domain);
 
-  // Use live data or fall back to mock
   const fatigue = summary?.fatigue ?? { ...MOCK_SUMMARY.fatigue, account_domain: domain, components: [], computed_at: new Date().toISOString() };
   const intent  = summary?.intent  ?? { account_domain: domain, ...MOCK_SUMMARY.intent, computed_at: new Date().toISOString() };
   const churn   = summary?.churn   ?? { account_domain: domain, ...MOCK_SUMMARY.churn, signal_breakdown: {}, computed_at: new Date().toISOString() };
   const nba     = summary?.current_nba ?? MOCK_SUMMARY.nba;
   const account = summary?.account ?? { id: "mock", domain, display_name: domain.split(".")[0].toUpperCase(), industry: "Technology", arr_usd: 480000, committee_size: 6, is_active: true, created_at: "", updated_at: "" };
+
+  const heatmapData = demoDetails?.heatmap ?? MOCK_HEATMAP;
+  const signalData  = demoDetails?.signals ?? MOCK_SIGNALS;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--light)", display: "flex", flexDirection: "column" }}>
@@ -200,7 +203,7 @@ export default function AccountDetailPage() {
               Recent{" "}
               <em style={{ fontStyle: "italic", color: "var(--gold)" }}>signals</em>
             </h2>
-            <SignalTimeline signals={MOCK_SIGNALS} maxItems={5} />
+            <SignalTimeline signals={signalData} maxItems={5} />
           </div>
         </div>
 
@@ -218,7 +221,7 @@ export default function AccountDetailPage() {
           </p>
           <div style={{ backgroundColor: "#ffffff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,51,102,0.08)", overflow: "hidden" }}>
             <div style={{ height: 3, backgroundColor: "var(--gold)" }} />
-            <CommitteeHeatmap data={MOCK_HEATMAP} />
+            <CommitteeHeatmap data={heatmapData} />
           </div>
         </section>
 

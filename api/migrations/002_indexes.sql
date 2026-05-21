@@ -12,18 +12,14 @@
 CREATE INDEX IF NOT EXISTS idx_accounts_domain
     ON accounts (domain);
 
-CREATE INDEX IF NOT EXISTS idx_accounts_is_active_domain
-    ON accounts (is_active, domain)
-    WHERE is_active = TRUE;
-
 -- Firmographic filters (used in account list with filtering)
 CREATE INDEX IF NOT EXISTS idx_accounts_industry
     ON accounts (industry)
     WHERE industry IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_accounts_arr_usd
-    ON accounts (arr_usd DESC NULLS LAST)
-    WHERE arr_usd IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_accounts_arr_band
+    ON accounts (arr_band)
+    WHERE arr_band IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- account_scores (intent + churn scores from Sprint 5 pipeline)
@@ -100,24 +96,16 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_resource_type
 -- committee_members (identity resolution — account-first rollup)
 -- ---------------------------------------------------------------------------
 
-CREATE INDEX IF NOT EXISTS idx_committee_members_account_domain
-    ON committee_members (account_domain);
+CREATE INDEX IF NOT EXISTS idx_committee_members_account_id
+    ON committee_members (account_id);
 
 CREATE INDEX IF NOT EXISTS idx_committee_members_email
     ON committee_members (email);
 
--- Current-member-only queries (most dashboard queries filter is_current=TRUE)
-CREATE INDEX IF NOT EXISTS idx_committee_members_account_current
-    ON committee_members (account_domain, is_current)
-    WHERE is_current = TRUE;
-
--- ---------------------------------------------------------------------------
--- account_cooldowns (Sprint 6 — Redis is authoritative; this is audit/fallback)
--- ---------------------------------------------------------------------------
-
-CREATE INDEX IF NOT EXISTS idx_account_cooldowns_account_id_active
-    ON account_cooldowns (account_id, expires_at)
-    WHERE cleared_at IS NULL;
+-- Active-member-only queries (most dashboard queries filter is_active=TRUE)
+CREATE INDEX IF NOT EXISTS idx_committee_members_account_active
+    ON committee_members (account_id, is_active)
+    WHERE is_active = TRUE;
 
 -- ---------------------------------------------------------------------------
 -- tenants (Sprint 8 — multi-tenant)

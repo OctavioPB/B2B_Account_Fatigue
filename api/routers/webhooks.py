@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 
 from api.middleware.auth import TenantContext, get_current_tenant
 from api.models.schemas import WebhookRegisterRequest, WebhookResponse
@@ -90,8 +91,8 @@ async def list_webhooks(tenant: _Tenant) -> list[WebhookResponse]:
     ]
 
 
-@router.delete("/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_webhook(webhook_id: str, tenant: _Tenant) -> None:
+@router.delete("/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_webhook(webhook_id: str, tenant: _Tenant) -> Response:
     """Deactivate a webhook registration."""
     webhook = _WEBHOOK_STORE.get(webhook_id)
 
@@ -110,3 +111,4 @@ async def delete_webhook(webhook_id: str, tenant: _Tenant) -> None:
         tenant.tenant_slug,
         webhook_id,
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -110,14 +110,26 @@ uv pip install -e ".[all,dev]"
 
 ### 4. Run database migrations
 
-```bash
-# Core schema (tenants, webhooks, audit log)
-psql $DATABASE_URL -f api/migrations/001_tenants_webhooks.sql
-psql $DATABASE_URL -f api/migrations/002_indexes.sql
-psql $DATABASE_URL -f api/migrations/003_audit_log.sql
+`psql` is not required locally — run migrations through the Docker container:
 
-# Account + identity schema
-psql $DATABASE_URL -f identity/migrations/001_initial_accounts.sql
+```bash
+# 1. Tenants + webhooks (API layer)
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < api/migrations/001_tenants_webhooks.sql
+
+# 2. Account identity schema (accounts, committee_members, aliases)
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < identity/migrations/001_initial_accounts.sql
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < identity/migrations/002_raw_event_tables.sql
+
+# 3. Scoring tables (account_scores, account_fatigue_scores)
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < scoring/migrations/001_account_scores.sql
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < scoring/migrations/002_account_fatigue_scores.sql
+
+# 4. NBA actions (next_best_actions)
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < orchestrator/migrations/001_nba_actions.sql
+
+# 5. Performance indexes + audit log (depends on all tables above)
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < api/migrations/002_indexes.sql
+docker exec -i harmoni-postgres psql -U harmoni -d harmoni < api/migrations/003_audit_log.sql
 ```
 
 ### 5. Install dashboard dependencies
