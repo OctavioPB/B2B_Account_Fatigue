@@ -12,6 +12,7 @@ const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/dashboard", label: "Portfolio" },
   { href: "/accounts", label: "Accounts" },
   { href: "/settings", label: "Settings" },
+  { href: "/info", label: "Info" },
 ];
 
 const navLink: React.CSSProperties = {

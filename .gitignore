@@ -67,6 +67,7 @@ override.tf.json
 *.swo
 .DS_Store
 Thumbs.db
+planning/
 
 # --- dbt ---
 pipelines/dbt/target/
