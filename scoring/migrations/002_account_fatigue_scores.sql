@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- Sprint 6: Account Fatigue Score Tables
 -- =============================================================================
 -- Stores time-series history of AccountFatigueScore and the audit trail for
@@ -10,11 +10,13 @@ BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- Enum: fatigue_severity
--- Mirrors ChurnRiskLevel values but is semantically distinct — describes the
+-- Mirrors ChurnRiskLevel values but is semantically distinct â€” describes the
 -- cognitive-load tier of a buying committee, not deal-loss probability.
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE fatigue_severity AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+DO $$ BEGIN
+    CREATE TYPE fatigue_severity AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- account_fatigue_scores
@@ -26,7 +28,7 @@ CREATE TABLE IF NOT EXISTS account_fatigue_scores (
     account_id          UUID NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
     account_domain      VARCHAR(255) NOT NULL,
 
-    -- Composite fatigue score: 0–100 (higher = more fatigued)
+    -- Composite fatigue score: 0â€“100 (higher = more fatigued)
     score               NUMERIC(5, 2) NOT NULL
                             CHECK (score >= 0 AND score <= 100),
 
@@ -49,19 +51,19 @@ CREATE TABLE IF NOT EXISTS account_fatigue_scores (
     computed_at         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_fatigue_scores_account_id ON account_fatigue_scores (account_id);
-CREATE INDEX idx_fatigue_scores_domain     ON account_fatigue_scores (account_domain);
-CREATE INDEX idx_fatigue_scores_time       ON account_fatigue_scores (computed_at DESC);
-CREATE INDEX idx_fatigue_scores_severity   ON account_fatigue_scores (severity, computed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fatigue_scores_account_id ON account_fatigue_scores (account_id);
+CREATE INDEX IF NOT EXISTS idx_fatigue_scores_domain     ON account_fatigue_scores (account_domain);
+CREATE INDEX IF NOT EXISTS idx_fatigue_scores_time       ON account_fatigue_scores (computed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fatigue_scores_severity   ON account_fatigue_scores (severity, computed_at DESC);
 
 -- Fast retrieval of latest fatigue score per account
-CREATE INDEX idx_fatigue_scores_latest ON account_fatigue_scores (account_id, computed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fatigue_scores_latest ON account_fatigue_scores (account_id, computed_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- account_cooldowns
 -- Audit trail for Redis-backed ActionCooldown entries.
 -- Redis is the live enforcement layer; this table provides durability and
--- compliance auditing. Rows are never deleted — cleared_at is set when a
+-- compliance auditing. Rows are never deleted â€” cleared_at is set when a
 -- cooldown expires or is manually lifted.
 -- ---------------------------------------------------------------------------
 
@@ -91,17 +93,17 @@ CREATE TABLE IF NOT EXISTS account_cooldowns (
     cleared_at      TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_cooldowns_entity        ON account_cooldowns (entity_type, entity_id);
-CREATE INDEX idx_cooldowns_domain        ON account_cooldowns (account_domain);
-CREATE INDEX idx_cooldowns_expires_at    ON account_cooldowns (expires_at);
-CREATE INDEX idx_cooldowns_active        ON account_cooldowns (entity_id, expires_at)
+CREATE INDEX IF NOT EXISTS idx_cooldowns_entity        ON account_cooldowns (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_cooldowns_domain        ON account_cooldowns (account_domain);
+CREATE INDEX IF NOT EXISTS idx_cooldowns_expires_at    ON account_cooldowns (expires_at);
+CREATE INDEX IF NOT EXISTS idx_cooldowns_active        ON account_cooldowns (entity_id, expires_at)
     WHERE cleared_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Convenience view: latest fatigue score per account
 -- ---------------------------------------------------------------------------
 
-CREATE VIEW v_latest_account_fatigue AS
+CREATE OR REPLACE VIEW v_latest_account_fatigue AS
 SELECT DISTINCT ON (account_id)
     id,
     account_id,
@@ -122,7 +124,7 @@ ORDER BY account_id, computed_at DESC;
 -- Convenience view: active cooldowns (not expired, not manually cleared)
 -- ---------------------------------------------------------------------------
 
-CREATE VIEW v_active_cooldowns AS
+CREATE OR REPLACE VIEW v_active_cooldowns AS
 SELECT
     id,
     entity_type,

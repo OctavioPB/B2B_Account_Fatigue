@@ -9,37 +9,24 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- Enumerations
+-- Enumerations (idempotent — duplicate_object is silently swallowed)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE seniority_level AS ENUM (
-    'C_SUITE',
-    'VP',
-    'DIRECTOR',
-    'MANAGER',
-    'IC'
-);
+DO $$ BEGIN
+    CREATE TYPE seniority_level AS ENUM ('C_SUITE','VP','DIRECTOR','MANAGER','IC');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE alias_type AS ENUM (
-    'ACQUISITION',
-    'REBRAND',
-    'SUBSIDIARY',
-    'MANUAL'
-);
+DO $$ BEGIN
+    CREATE TYPE alias_type AS ENUM ('ACQUISITION','REBRAND','SUBSIDIARY','MANUAL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE resolution_confidence AS ENUM (
-    'HIGH',
-    'MEDIUM',
-    'LOW',
-    'UNRESOLVABLE'
-);
+DO $$ BEGIN
+    CREATE TYPE resolution_confidence AS ENUM ('HIGH','MEDIUM','LOW','UNRESOLVABLE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE quarantine_status AS ENUM (
-    'PENDING',
-    'REVIEWED',
-    'RESOLVED',
-    'DISCARDED'
-);
+DO $$ BEGIN
+    CREATE TYPE quarantine_status AS ENUM ('PENDING','REVIEWED','RESOLVED','DISCARDED');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- accounts
@@ -66,10 +53,10 @@ CREATE TABLE IF NOT EXISTS accounts (
     CONSTRAINT accounts_domain_unique UNIQUE (domain)
 );
 
-CREATE INDEX idx_accounts_domain     ON accounts (domain);
-CREATE INDEX idx_accounts_industry   ON accounts (industry);
-CREATE INDEX idx_accounts_arr_band   ON accounts (arr_band);
-CREATE INDEX idx_accounts_updated_at ON accounts (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_accounts_domain     ON accounts (domain);
+CREATE INDEX IF NOT EXISTS idx_accounts_industry   ON accounts (industry);
+CREATE INDEX IF NOT EXISTS idx_accounts_arr_band   ON accounts (arr_band);
+CREATE INDEX IF NOT EXISTS idx_accounts_updated_at ON accounts (updated_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- domain_aliases
@@ -90,10 +77,9 @@ CREATE TABLE IF NOT EXISTS domain_aliases (
     CONSTRAINT domain_aliases_unique UNIQUE (alias_domain, effective_from)
 );
 
-CREATE INDEX idx_domain_aliases_alias     ON domain_aliases (alias_domain);
-CREATE INDEX idx_domain_aliases_canonical ON domain_aliases (canonical_domain);
--- Partial index: only active aliases
-CREATE INDEX idx_domain_aliases_active    ON domain_aliases (alias_domain)
+CREATE INDEX IF NOT EXISTS idx_domain_aliases_alias     ON domain_aliases (alias_domain);
+CREATE INDEX IF NOT EXISTS idx_domain_aliases_canonical ON domain_aliases (canonical_domain);
+CREATE INDEX IF NOT EXISTS idx_domain_aliases_active    ON domain_aliases (alias_domain)
     WHERE effective_to IS NULL;
 
 -- ---------------------------------------------------------------------------
@@ -124,11 +110,11 @@ CREATE TABLE IF NOT EXISTS committee_members (
     CONSTRAINT committee_members_email_account_unique UNIQUE (email, account_id)
 );
 
-CREATE INDEX idx_committee_members_account_id   ON committee_members (account_id);
-CREATE INDEX idx_committee_members_email        ON committee_members (email);
-CREATE INDEX idx_committee_members_crm_contact  ON committee_members (crm_contact_id)
+CREATE INDEX IF NOT EXISTS idx_committee_members_account_id   ON committee_members (account_id);
+CREATE INDEX IF NOT EXISTS idx_committee_members_email        ON committee_members (email);
+CREATE INDEX IF NOT EXISTS idx_committee_members_crm_contact  ON committee_members (crm_contact_id)
     WHERE crm_contact_id IS NOT NULL;
-CREATE INDEX idx_committee_members_active       ON committee_members (account_id)
+CREATE INDEX IF NOT EXISTS idx_committee_members_active       ON committee_members (account_id)
     WHERE is_active = TRUE;
 
 -- ---------------------------------------------------------------------------
@@ -149,8 +135,8 @@ CREATE TABLE IF NOT EXISTS crm_account_xref (
     CONSTRAINT crm_account_xref_unique UNIQUE (crm_source, crm_company_id)
 );
 
-CREATE INDEX idx_crm_xref_domain ON crm_account_xref (canonical_domain);
-CREATE INDEX idx_crm_xref_lookup ON crm_account_xref (crm_source, crm_company_id);
+CREATE INDEX IF NOT EXISTS idx_crm_xref_domain ON crm_account_xref (canonical_domain);
+CREATE INDEX IF NOT EXISTS idx_crm_xref_lookup ON crm_account_xref (crm_source, crm_company_id);
 
 -- ---------------------------------------------------------------------------
 -- resolution_quarantine
@@ -172,11 +158,10 @@ CREATE TABLE IF NOT EXISTS resolution_quarantine (
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_quarantine_status     ON resolution_quarantine (status);
-CREATE INDEX idx_quarantine_event_id   ON resolution_quarantine (event_id);
-CREATE INDEX idx_quarantine_created_at ON resolution_quarantine (created_at DESC);
--- Most queries are for PENDING entries
-CREATE INDEX idx_quarantine_pending    ON resolution_quarantine (created_at DESC)
+CREATE INDEX IF NOT EXISTS idx_quarantine_status     ON resolution_quarantine (status);
+CREATE INDEX IF NOT EXISTS idx_quarantine_event_id   ON resolution_quarantine (event_id);
+CREATE INDEX IF NOT EXISTS idx_quarantine_created_at ON resolution_quarantine (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quarantine_pending    ON resolution_quarantine (created_at DESC)
     WHERE status = 'PENDING';
 
 -- ---------------------------------------------------------------------------
@@ -191,15 +176,15 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER accounts_updated_at
+CREATE OR REPLACE TRIGGER accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER committee_members_updated_at
+CREATE OR REPLACE TRIGGER committee_members_updated_at
     BEFORE UPDATE ON committee_members
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER crm_xref_updated_at
+CREATE OR REPLACE TRIGGER crm_xref_updated_at
     BEFORE UPDATE ON crm_account_xref
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 

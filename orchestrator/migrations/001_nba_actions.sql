@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- Sprint 7: Next Best Action (NBA) Table
 -- =============================================================================
 -- Stores one active NextBestAction per account at any point in time.
@@ -17,20 +17,22 @@ BEGIN;
 -- All seven canonical NBA action types (per CLAUDE.md Section 4.7)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE nba_action_type AS ENUM (
-    'COOLDOWN',         -- Pause all outreach; account is fatigued
-    'NURTURE',          -- Low-pressure educational content sequence
-    'RE_ENGAGE',        -- Personalized re-engagement for declining accounts
-    'ACCELERATE',       -- High-intent — escalate cadence and frequency
-    'EXEC_ESCALATION',  -- Route to AE/VP for exec-to-exec outreach
-    'PRICING_TRIGGER',  -- Surface pricing/ROI content (high intent detected)
-    'DEAL_REVIEW'       -- Internal flag — churn risk critical, human review required
-);
+DO $$ BEGIN
+    CREATE TYPE nba_action_type AS ENUM (
+        'COOLDOWN',
+        'NURTURE',
+        'RE_ENGAGE',
+        'ACCELERATE',
+        'EXEC_ESCALATION',
+        'PRICING_TRIGGER',
+        'DEAL_REVIEW'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- next_best_actions
 -- One row per recommended action per account per orchestration run.
--- Never delete rows — use is_active=FALSE + superseded_by to deactivate.
+-- Never delete rows â€” use is_active=FALSE + superseded_by to deactivate.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS next_best_actions (
@@ -69,20 +71,20 @@ CREATE TABLE IF NOT EXISTS next_best_actions (
     superseded_by   UUID REFERENCES next_best_actions (id)
 );
 
-CREATE INDEX idx_nba_account_id     ON next_best_actions (account_id);
-CREATE INDEX idx_nba_domain         ON next_best_actions (account_domain);
-CREATE INDEX idx_nba_action_type    ON next_best_actions (action_type);
-CREATE INDEX idx_nba_created_at     ON next_best_actions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_nba_account_id     ON next_best_actions (account_id);
+CREATE INDEX IF NOT EXISTS idx_nba_domain         ON next_best_actions (account_domain);
+CREATE INDEX IF NOT EXISTS idx_nba_action_type    ON next_best_actions (action_type);
+CREATE INDEX IF NOT EXISTS idx_nba_created_at     ON next_best_actions (created_at DESC);
 
 -- Fast lookup of active NBA per account (the common read path)
-CREATE INDEX idx_nba_active ON next_best_actions (account_id, is_active, expires_at)
+CREATE INDEX IF NOT EXISTS idx_nba_active ON next_best_actions (account_id, is_active, expires_at)
     WHERE is_active = TRUE;
 
 -- ---------------------------------------------------------------------------
 -- Convenience view: current (active, non-expired) NBA per account
 -- ---------------------------------------------------------------------------
 
-CREATE VIEW v_active_nba AS
+CREATE OR REPLACE VIEW v_active_nba AS
 SELECT DISTINCT ON (account_id)
     id,
     account_id,

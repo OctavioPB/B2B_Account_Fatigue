@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- Sprint 4: Raw Event Landing Tables
 -- =============================================================================
 -- Kafka consumers write deserialized events into these tables.
@@ -13,8 +13,13 @@ BEGIN;
 -- Shared enum: signal strength (mirrors Avro schema)
 -- ---------------------------------------------------------------------------
 
-CREATE TYPE signal_strength AS ENUM ('WEAK', 'MEDIUM', 'STRONG');
-CREATE TYPE source_system    AS ENUM ('WEB', 'EMAIL', 'CRM', 'WEBINAR', 'MANUAL');
+DO $$ BEGIN
+    CREATE TYPE signal_strength AS ENUM ('WEAK', 'MEDIUM', 'STRONG');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE source_system AS ENUM ('WEB', 'EMAIL', 'CRM', 'WEBINAR', 'MANUAL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- raw_web_pageviews
@@ -40,9 +45,9 @@ CREATE TABLE IF NOT EXISTS raw_web_pageviews (
     _loaded_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_raw_web_domain      ON raw_web_pageviews (account_domain);
-CREATE INDEX idx_raw_web_occurred_at ON raw_web_pageviews (occurred_at DESC);
-CREATE INDEX idx_raw_web_event_id    ON raw_web_pageviews (event_id);
+CREATE INDEX IF NOT EXISTS idx_raw_web_domain      ON raw_web_pageviews (account_domain);
+CREATE INDEX IF NOT EXISTS idx_raw_web_occurred_at ON raw_web_pageviews (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_raw_web_event_id    ON raw_web_pageviews (event_id);
 
 -- ---------------------------------------------------------------------------
 -- raw_email_engagements
@@ -66,10 +71,10 @@ CREATE TABLE IF NOT EXISTS raw_email_engagements (
     _loaded_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_raw_email_domain      ON raw_email_engagements (account_domain);
-CREATE INDEX idx_raw_email_occurred_at ON raw_email_engagements (occurred_at DESC);
-CREATE INDEX idx_raw_email_event_id    ON raw_email_engagements (event_id);
-CREATE INDEX idx_raw_email_negative    ON raw_email_engagements (account_domain)
+CREATE INDEX IF NOT EXISTS idx_raw_email_domain      ON raw_email_engagements (account_domain);
+CREATE INDEX IF NOT EXISTS idx_raw_email_occurred_at ON raw_email_engagements (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_raw_email_event_id    ON raw_email_engagements (event_id);
+CREATE INDEX IF NOT EXISTS idx_raw_email_negative    ON raw_email_engagements (account_domain)
     WHERE is_negative = TRUE;
 
 -- ---------------------------------------------------------------------------
@@ -95,10 +100,10 @@ CREATE TABLE IF NOT EXISTS raw_crm_contact_activities (
     _loaded_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_raw_crm_domain      ON raw_crm_contact_activities (account_domain);
-CREATE INDEX idx_raw_crm_occurred_at ON raw_crm_contact_activities (occurred_at DESC);
-CREATE INDEX idx_raw_crm_event_id    ON raw_crm_contact_activities (event_id);
-CREATE INDEX idx_raw_crm_source      ON raw_crm_contact_activities (crm_source, crm_company_id);
+CREATE INDEX IF NOT EXISTS idx_raw_crm_domain      ON raw_crm_contact_activities (account_domain);
+CREATE INDEX IF NOT EXISTS idx_raw_crm_occurred_at ON raw_crm_contact_activities (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_raw_crm_event_id    ON raw_crm_contact_activities (event_id);
+CREATE INDEX IF NOT EXISTS idx_raw_crm_source      ON raw_crm_contact_activities (crm_source, crm_company_id);
 
 -- ---------------------------------------------------------------------------
 -- raw_webinar_attendances
@@ -126,9 +131,9 @@ CREATE TABLE IF NOT EXISTS raw_webinar_attendances (
     _loaded_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_raw_webinar_domain      ON raw_webinar_attendances (account_domain);
-CREATE INDEX idx_raw_webinar_occurred_at ON raw_webinar_attendances (occurred_at DESC);
-CREATE INDEX idx_raw_webinar_event_id    ON raw_webinar_attendances (event_id);
+CREATE INDEX IF NOT EXISTS idx_raw_webinar_domain      ON raw_webinar_attendances (account_domain);
+CREATE INDEX IF NOT EXISTS idx_raw_webinar_occurred_at ON raw_webinar_attendances (occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_raw_webinar_event_id    ON raw_webinar_attendances (event_id);
 
 -- ---------------------------------------------------------------------------
 -- ClickHouse mirror: fct_account_signal_hourly
